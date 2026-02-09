@@ -54,6 +54,26 @@ export OPENCODE_RTS_THEME=redalert-soviet
 
 The environment variable overrides the config file.
 
+### Switch theme with slash command
+
+Use the `/rts-theme` command inside OpenCode:
+
+```
+/rts-theme warcraft-orc
+```
+
+Run `/rts-theme` without an argument to see available themes.
+
+### Switch theme via AI
+
+Ask the AI to switch themes naturally — it has access to an `rts_set_theme` tool:
+
+```
+switch to the red alert soviet theme
+```
+
+Both methods take effect immediately without restarting OpenCode.
+
 ## Events
 
 ### StarCraft (Terran)
