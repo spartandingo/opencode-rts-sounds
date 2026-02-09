@@ -1,6 +1,6 @@
 {
   "name": "opencode-rts-sounds",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "RTS sound effects plugin for OpenCode - StarCraft, Warcraft III, and C&C Red Alert voice lines on session events",
   "main": "index.js",
   "type": "module",
