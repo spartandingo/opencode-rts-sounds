@@ -10,6 +10,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from "fs"
 import { spawn } from "child_process"
+import { tool } from "@opencode-ai/plugin/tool"
 
 // Import built-in themes
 import starcraft from "./themes/starcraft.js"
@@ -181,8 +182,8 @@ export const RtsSoundsPlugin = async ({ client }) => {
   }
 
   const { themeName, themes } = getThemeNameAndThemes()
-  const theme = themes[themeName]
-  const soundsDir = join(SOUNDS_BASE, theme.name)
+  let theme = themes[themeName]
+  let soundsDir = join(SOUNDS_BASE, theme.name)
 
   await log(`Using theme: ${theme.label || theme.name}`)
 
@@ -201,6 +202,43 @@ export const RtsSoundsPlugin = async ({ client }) => {
       if (!sounds || sounds.length === 0) return
 
       playSound(join(soundsDir, pick(sounds)))
+    },
+    tool: {
+      rts_set_theme: tool({
+        description:
+          "Switch the RTS sound effects theme. Available themes: " +
+          Object.entries(getAllThemes())
+            .map(([k, v]) => `"${k}" (${v.label || k})`)
+            .join(", "),
+        args: {
+          theme: tool.schema.string(),
+        },
+        async execute(args) {
+          const available = getAllThemes()
+          if (!available[args.theme]) {
+            const names = Object.keys(available).join(", ")
+            return `Unknown theme "${args.theme}". Available: ${names}`
+          }
+
+          const newTheme = available[args.theme]
+
+          // Download sounds if needed
+          if (!soundsExist(newTheme)) {
+            await downloadSounds(newTheme, (msg) => log(msg))
+          }
+
+          // Switch at runtime
+          theme = newTheme
+          soundsDir = join(SOUNDS_BASE, newTheme.name)
+
+          // Persist to config
+          mkdirSync(SOUNDS_BASE, { recursive: true })
+          writeFileSync(CONFIG_PATH, JSON.stringify({ theme: args.theme }, null, 2))
+
+          await log(`Switched to theme: ${newTheme.label || newTheme.name}`)
+          return `Switched to ${newTheme.label || newTheme.name} theme`
+        },
+      }),
     },
   }
 }

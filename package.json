@@ -22,6 +22,7 @@
     "url": "git+https://github.com/spartandingo/opencode-rts-sounds.git"
   },
   "dependencies": {
+    "@opencode-ai/plugin": "^1.1.53",
     "jszip": "^3.10.1"
   },
   "files": [
