@@ -1,0 +1,28 @@
+{
+  "name": "opencode-rts-sounds",
+  "version": "1.0.0",
+  "description": "RTS sound effects plugin for OpenCode - StarCraft, Warcraft III, and C&C Red Alert voice lines on session events",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "starcraft",
+    "warcraft",
+    "red-alert",
+    "command-and-conquer",
+    "rts",
+    "sounds",
+    "notifications"
+  ],
+  "author": "Brett Christensen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spartandingo/opencode-rts-sounds.git"
+  },
+  "files": [
+    "index.js",
+    "themes/"
+  ]
+}
