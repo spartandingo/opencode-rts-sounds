@@ -196,7 +196,71 @@ export const RtsSoundsPlugin = async ({ client }) => {
     }
   }
 
+  // Helper to switch themes (used by both tool and command)
+  const switchTheme = async (themeName) => {
+    const available = getAllThemes()
+    if (!available[themeName]) {
+      const names = Object.keys(available).join(", ")
+      return { success: false, message: `Unknown theme "${themeName}". Available: ${names}` }
+    }
+
+    const newTheme = available[themeName]
+
+    // Download sounds if needed
+    if (!soundsExist(newTheme)) {
+      await downloadSounds(newTheme, (msg) => log(msg))
+    }
+
+    // Switch at runtime
+    theme = newTheme
+    soundsDir = join(SOUNDS_BASE, newTheme.name)
+
+    // Persist to config
+    mkdirSync(SOUNDS_BASE, { recursive: true })
+    writeFileSync(CONFIG_PATH, JSON.stringify({ theme: themeName }, null, 2))
+
+    await log(`Switched to theme: ${newTheme.label || newTheme.name}`)
+    return { success: true, message: `Switched to ${newTheme.label || newTheme.name} theme` }
+  }
+
   return {
+    config: async (input) => {
+      input.command ??= {}
+      const themeList = Object.entries(getAllThemes())
+        .map(([k, v]) => `  ${k} - ${v.label || k}`)
+        .join("\n")
+      input.command["rts-theme"] = {
+        description: "Switch RTS sound theme",
+        template: `Available themes:\n${themeList}\n\nUsage: /rts-theme <theme-name>`,
+      }
+    },
+    "command.execute.before": async (input, output) => {
+      if (input.command !== "rts-theme") return
+
+      const themeName = input.arguments?.trim()
+      if (!themeName) {
+        // No argument - list themes via toast
+        const themeList = Object.entries(getAllThemes())
+          .map(([k, v]) => `${k}${k === theme.name ? " (current)" : ""}`)
+          .join(", ")
+        await client.tui.showToast({
+          body: { message: `RTS themes: ${themeList}`, variant: "info" },
+        })
+        // Clear parts so AI doesn't respond
+        output.parts = []
+        return
+      }
+
+      const result = await switchTheme(themeName)
+      await client.tui.showToast({
+        body: {
+          message: result.message,
+          variant: result.success ? "success" : "error",
+        },
+      })
+      // Clear parts so AI doesn't respond
+      output.parts = []
+    },
     event: async ({ event }) => {
       const sounds = theme.eventSounds[event.type]
       if (!sounds || sounds.length === 0) return
@@ -214,29 +278,8 @@ export const RtsSoundsPlugin = async ({ client }) => {
           theme: tool.schema.string(),
         },
         async execute(args) {
-          const available = getAllThemes()
-          if (!available[args.theme]) {
-            const names = Object.keys(available).join(", ")
-            return `Unknown theme "${args.theme}". Available: ${names}`
-          }
-
-          const newTheme = available[args.theme]
-
-          // Download sounds if needed
-          if (!soundsExist(newTheme)) {
-            await downloadSounds(newTheme, (msg) => log(msg))
-          }
-
-          // Switch at runtime
-          theme = newTheme
-          soundsDir = join(SOUNDS_BASE, newTheme.name)
-
-          // Persist to config
-          mkdirSync(SOUNDS_BASE, { recursive: true })
-          writeFileSync(CONFIG_PATH, JSON.stringify({ theme: args.theme }, null, 2))
-
-          await log(`Switched to theme: ${newTheme.label || newTheme.name}`)
-          return `Switched to ${newTheme.label || newTheme.name} theme`
+          const result = await switchTheme(args.theme)
+          return result.message
         },
       }),
     },
