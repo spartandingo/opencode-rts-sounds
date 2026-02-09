@@ -21,6 +21,9 @@
     "type": "git",
     "url": "git+https://github.com/spartandingo/opencode-rts-sounds.git"
   },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
   "files": [
     "index.js",
     "themes/"
