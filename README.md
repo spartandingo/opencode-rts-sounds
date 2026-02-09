@@ -25,11 +25,12 @@ cp -r opencode-rts-sounds/index.js opencode-rts-sounds/themes ~/.config/opencode
 
 ## Themes
 
-Five themes are available:
+Six built-in themes are available:
 
 | Theme | Game | Faction |
 |---|---|---|
 | `starcraft` (default) | StarCraft | Terran SCV + Protoss Advisor |
+| `protoss-zealot` | StarCraft | Protoss Zealot + Advisor |
 | `warcraft-human` | Warcraft III | Human Peasant |
 | `warcraft-orc` | Warcraft III | Orc Peon |
 | `redalert-allied` | C&C Red Alert 3 | Allied EVA |
@@ -41,7 +42,7 @@ Create `~/.config/opencode/sounds/config.json`:
 
 ```json
 {
-  "theme": "warcraft-orc"
+  "theme": "protoss-zealot"
 }
 ```
 
@@ -55,7 +56,7 @@ The environment variable overrides the config file.
 
 ## Events
 
-### StarCraft
+### StarCraft (Terran)
 
 | Event | Sound |
 |---|---|
@@ -64,6 +65,16 @@ The environment variable overrides the config file.
 | `session.compacted` | **"You must construct additional pylons!"** |
 | `session.error` | "Not enough minerals" / "Insufficient vespene gas" |
 | `permission.asked` | "Whaddya want?" |
+
+### StarCraft (Protoss Zealot)
+
+| Event | Sound |
+|---|---|
+| `session.created` | **"My life for Aiur!"** |
+| `session.idle` | Zealot acknowledgments |
+| `session.compacted` | **"You must construct additional pylons!"** |
+| `session.error` | "Not enough minerals" / "Insufficient vespene gas" |
+| `permission.asked` | Zealot "what" responses |
 
 ### Warcraft III (Human / Orc)
 
@@ -84,6 +95,72 @@ The environment variable overrides the config file.
 | `session.compacted` | "Insufficient funds" / "Low power" |
 | `session.error` | "Cannot deploy here" |
 | `permission.asked` | "On hold" / "Select unit" |
+
+## Custom Themes
+
+Create your own theme by adding a JSON file to `~/.config/opencode/sounds/themes/`.
+
+### Example: custom theme with downloadable sounds
+
+Create `~/.config/opencode/sounds/themes/my-theme.json`:
+
+```json
+{
+  "name": "my-theme",
+  "label": "My Custom Theme",
+  "soundPacks": {
+    "my-sounds": {
+      "url": "https://example.com/sounds.zip",
+      "files": {
+        "path/inside/zip/ready.wav": "ready.wav",
+        "path/inside/zip/done.wav": "done.wav",
+        "path/inside/zip/error.wav": "error.wav",
+        "path/inside/zip/waiting.wav": "waiting.wav"
+      }
+    }
+  },
+  "eventSounds": {
+    "session.created": ["ready.wav"],
+    "session.idle": ["done.wav"],
+    "session.compacted": ["error.wav"],
+    "session.error": ["error.wav"],
+    "permission.asked": ["waiting.wav"]
+  }
+}
+```
+
+### Example: custom theme with local sound files
+
+If you already have sound files, skip `soundPacks` and place your `.wav` files directly in `~/.config/opencode/sounds/<theme-name>/`:
+
+```json
+{
+  "name": "my-local-theme",
+  "label": "My Local Theme",
+  "eventSounds": {
+    "session.created": ["startup.wav"],
+    "session.idle": ["complete.wav"],
+    "session.compacted": ["warning.wav"],
+    "session.error": ["error.wav"],
+    "permission.asked": ["question.wav"]
+  }
+}
+```
+
+Then place your files in `~/.config/opencode/sounds/my-local-theme/`.
+
+### Theme format reference
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Theme identifier (used as directory name and config key) |
+| `label` | string | no | Human-readable display name |
+| `soundPacks` | object | no | ZIP archives to download (omit for local-only themes) |
+| `soundPacks.*.url` | string | yes | Download URL for the ZIP archive |
+| `soundPacks.*.files` | object | yes | Map of `"path/in/zip.wav": "local-filename.wav"` |
+| `eventSounds` | object | yes | Map of OpenCode event types to arrays of sound filenames |
+
+Custom themes with the same name as a built-in theme will override it.
 
 ## How it works
 

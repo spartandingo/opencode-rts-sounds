@@ -11,15 +11,17 @@ import { homedir } from "os"
 import { existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from "fs"
 import { spawn } from "child_process"
 
-// Import all themes
+// Import built-in themes
 import starcraft from "./themes/starcraft.js"
+import protossZealot from "./themes/protoss-zealot.js"
 import warcraftHuman from "./themes/warcraft-human.js"
 import warcraftOrc from "./themes/warcraft-orc.js"
 import redalertAllied from "./themes/redalert-allied.js"
 import redalertSoviet from "./themes/redalert-soviet.js"
 
-const THEMES = {
+const BUILTIN_THEMES = {
   starcraft,
+  "protoss-zealot": protossZealot,
   "warcraft-human": warcraftHuman,
   "warcraft-orc": warcraftOrc,
   "redalert-allied": redalertAllied,
@@ -27,25 +29,57 @@ const THEMES = {
 }
 
 const SOUNDS_BASE = join(homedir(), ".config", "opencode", "sounds")
+const CUSTOM_THEMES_DIR = join(SOUNDS_BASE, "themes")
 const CONFIG_PATH = join(SOUNDS_BASE, "config.json")
 const DEFAULT_THEME = "starcraft"
 
-function getThemeName() {
+function loadCustomThemes() {
+  const custom = {}
+  if (!existsSync(CUSTOM_THEMES_DIR)) return custom
+
+  try {
+    for (const file of readdirSync(CUSTOM_THEMES_DIR)) {
+      if (!file.endsWith(".json")) continue
+      try {
+        const theme = JSON.parse(readFileSync(join(CUSTOM_THEMES_DIR, file), "utf8"))
+        if (theme.name && theme.eventSounds) {
+          custom[theme.name] = theme
+        }
+      } catch {
+        // Skip malformed theme files
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+
+  return custom
+}
+
+function getAllThemes() {
+  const custom = loadCustomThemes()
+  // Custom themes override built-in themes with the same name
+  return { ...BUILTIN_THEMES, ...custom }
+}
+
+function getThemeNameAndThemes() {
+  const themes = getAllThemes()
+
   // Env var takes priority
   const envTheme = process.env.OPENCODE_RTS_THEME
-  if (envTheme && THEMES[envTheme]) return envTheme
+  if (envTheme && themes[envTheme]) return { themeName: envTheme, themes }
 
   // Then config file
   try {
     if (existsSync(CONFIG_PATH)) {
       const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"))
-      if (config.theme && THEMES[config.theme]) return config.theme
+      if (config.theme && themes[config.theme]) return { themeName: config.theme, themes }
     }
   } catch {
     // Ignore malformed config
   }
 
-  return DEFAULT_THEME
+  return { themeName: DEFAULT_THEME, themes }
 }
 
 function pick(arr) {
@@ -66,6 +100,10 @@ function playSound(file) {
 function soundsExist(theme) {
   const dir = join(SOUNDS_BASE, theme.name)
   if (!existsSync(dir)) return false
+
+  // If no soundPacks defined (local-only theme), just check the dir exists
+  if (!theme.soundPacks || Object.keys(theme.soundPacks).length === 0) return true
+
   try {
     const files = readdirSync(dir)
     const expected = Object.values(theme.soundPacks).flatMap((pack) =>
@@ -78,13 +116,18 @@ function soundsExist(theme) {
 }
 
 async function downloadSounds(theme, log) {
+  if (!theme.soundPacks || Object.keys(theme.soundPacks).length === 0) {
+    log(`Theme ${theme.name} has no soundPacks to download`)
+    return
+  }
+
   const dir = join(SOUNDS_BASE, theme.name)
-  log(`Downloading ${theme.label} sounds...`)
+  log(`Downloading ${theme.label || theme.name} sounds...`)
   mkdirSync(dir, { recursive: true })
 
   const { default: JSZip } = await import("jszip")
 
-  // Dedupe URLs -- multiple themes may share the same zip (e.g. interface warnings)
+  // Dedupe URLs -- multiple packs may share the same zip
   const urlToEntries = {}
   for (const [, pack] of Object.entries(theme.soundPacks)) {
     if (!urlToEntries[pack.url]) {
@@ -119,7 +162,7 @@ async function downloadSounds(theme, log) {
     }
   }
 
-  log(`${theme.label} sounds ready!`)
+  log(`${theme.label || theme.name} sounds ready!`)
 }
 
 export const RtsSoundsPlugin = async ({ client }) => {
@@ -137,11 +180,11 @@ export const RtsSoundsPlugin = async ({ client }) => {
     }
   }
 
-  const themeName = getThemeName()
-  const theme = THEMES[themeName]
+  const { themeName, themes } = getThemeNameAndThemes()
+  const theme = themes[themeName]
   const soundsDir = join(SOUNDS_BASE, theme.name)
 
-  await log(`Using theme: ${theme.label}`)
+  await log(`Using theme: ${theme.label || theme.name}`)
 
   // Download sounds on first run
   if (!soundsExist(theme)) {
