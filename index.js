@@ -34,6 +34,26 @@ const CUSTOM_THEMES_DIR = join(SOUNDS_BASE, "themes")
 const CONFIG_PATH = join(SOUNDS_BASE, "config.json")
 const DEFAULT_THEME = "starcraft"
 
+function readConfig() {
+  try {
+    if (existsSync(CONFIG_PATH)) {
+      return JSON.parse(readFileSync(CONFIG_PATH, "utf8"))
+    }
+  } catch {
+    // Ignore malformed config
+  }
+  return {}
+}
+
+function writeConfig(config) {
+  mkdirSync(SOUNDS_BASE, { recursive: true })
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+}
+
+function isMuted() {
+  return readConfig().muted === true
+}
+
 function loadCustomThemes() {
   const custom = {}
   if (!existsSync(CUSTOM_THEMES_DIR)) return custom
@@ -71,14 +91,8 @@ function getThemeNameAndThemes() {
   if (envTheme && themes[envTheme]) return { themeName: envTheme, themes }
 
   // Then config file
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"))
-      if (config.theme && themes[config.theme]) return { themeName: config.theme, themes }
-    }
-  } catch {
-    // Ignore malformed config
-  }
+  const config = readConfig()
+  if (config.theme && themes[config.theme]) return { themeName: config.theme, themes }
 
   return { themeName: DEFAULT_THEME, themes }
 }
@@ -216,11 +230,22 @@ export const RtsSoundsPlugin = async ({ client }) => {
     soundsDir = join(SOUNDS_BASE, newTheme.name)
 
     // Persist to config
-    mkdirSync(SOUNDS_BASE, { recursive: true })
-    writeFileSync(CONFIG_PATH, JSON.stringify({ theme: themeName }, null, 2))
+    const config = readConfig()
+    config.theme = themeName
+    writeConfig(config)
 
     await log(`Switched to theme: ${newTheme.label || newTheme.name}`)
     return { success: true, message: `Switched to ${newTheme.label || newTheme.name} theme` }
+  }
+
+  // Helper to toggle mute (used by both tool and command)
+  const toggleMute = () => {
+    const config = readConfig()
+    const wasMuted = config.muted === true
+    config.muted = !wasMuted
+    writeConfig(config)
+    const status = wasMuted ? "unmuted" : "muted"
+    return { muted: !wasMuted, message: `Sound effects ${status}.` }
   }
 
   return {
@@ -233,8 +258,28 @@ export const RtsSoundsPlugin = async ({ client }) => {
         description: "Switch RTS sound theme",
         template: `Available themes:\n${themeList}\n\nUsage: /rts-theme <theme-name>`,
       }
+      input.command["mute"] = {
+        description: "Toggle RTS sound effects on/off",
+        template: "Mute toggled.",
+      }
     },
     "command.execute.before": async (input, output) => {
+      if (input.command === "mute") {
+        const result = toggleMute()
+        if (!result.muted) {
+          // Play a confirmation sound when unmuting
+          const sounds = theme.eventSounds["session.idle"]
+          if (sounds?.length) {
+            playSound(join(soundsDir, pick(sounds)))
+          }
+        }
+        await client.tui.showToast({
+          body: { message: result.message, variant: "info" },
+        })
+        output.parts = []
+        return
+      }
+
       if (input.command !== "rts-theme") return
 
       const themeName = input.arguments?.trim()
@@ -262,6 +307,8 @@ export const RtsSoundsPlugin = async ({ client }) => {
       output.parts = []
     },
     event: async ({ event }) => {
+      if (isMuted()) return
+
       const sounds = theme.eventSounds[event.type]
       if (!sounds || sounds.length === 0) return
 
@@ -279,6 +326,15 @@ export const RtsSoundsPlugin = async ({ client }) => {
         },
         async execute(args) {
           const result = await switchTheme(args.theme)
+          return result.message
+        },
+      }),
+      rts_mute_toggle: tool({
+        description:
+          "Toggle mute/unmute for RTS sound effects. When muted, no sounds play on session events. Returns the new mute state.",
+        args: {},
+        async execute() {
+          const result = toggleMute()
           return result.message
         },
       }),
