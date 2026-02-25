@@ -74,6 +74,28 @@ switch to the red alert soviet theme
 
 Both methods take effect immediately without restarting OpenCode.
 
+## Mute / Unmute
+
+### Toggle with slash command
+
+Use the `/mute` command inside OpenCode to toggle sounds on or off:
+
+```
+/mute
+```
+
+A toast notification confirms the new state. When unmuting, a confirmation sound plays.
+
+### Toggle via AI
+
+Ask the AI naturally — it has access to an `rts_mute_toggle` tool:
+
+```
+mute the sounds
+```
+
+Mute state persists across sessions (stored in `~/.config/opencode/sounds/config.json`).
+
 ## Events
 
 ### StarCraft (Terran)
